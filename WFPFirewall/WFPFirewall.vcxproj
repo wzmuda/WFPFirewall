@@ -134,6 +134,11 @@
   <ItemGroup>
     <ClInclude Include="ConfigParser.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="wfpfirewall.cfg">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
