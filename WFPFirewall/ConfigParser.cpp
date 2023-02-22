@@ -21,7 +21,8 @@ ConfigParser::ConfigParser(std::ifstream& config_file) {
 		}
 
 		ConfigEntry e;
-		e.ip = htonl(inet_addr(match[1].str().c_str()));
+		e.host = match[1].str();
+		e.ip = htonl(inet_addr(e.host.c_str()));
 		uint8_t mask = match[2].matched ? static_cast<uint32_t>(std::stoul(match[2].str())) : 32;
 		e.mask = htonl(static_cast<uint32_t>((1ULL << mask) - 1));
 		e.port = htons( match[3].matched ? static_cast<uint32_t>(std::stoul(match[3].str())) : 0);
