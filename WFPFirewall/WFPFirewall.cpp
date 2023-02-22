@@ -20,7 +20,7 @@ int main()
     DWORD errorCode = ERROR_SUCCESS;
 
     // Create a session with the WFP engine
-    errorCode = FwpmEngineOpen0(NULL, RPC_C_AUTHN_WINNT, NULL, &session, &engineHandle);
+    errorCode = FwpmEngineOpen(NULL, RPC_C_AUTHN_WINNT, NULL, &session, &engineHandle);
     if (errorCode != ERROR_SUCCESS) {
         std::cout << "Failed to open WFP engine. Error code: " << errorCode << std::endl;
         return errorCode;
@@ -43,7 +43,7 @@ int main()
     filter.displayData.description = const_cast<wchar_t*>(L"Filter to block all outbound connections.");
 
     // Add the filter to the WFP engine
-    errorCode = FwpmFilterAdd0(engineHandle, &filter, NULL, &filterId);
+    errorCode = FwpmFilterAdd(engineHandle, &filter, NULL, &filterId);
     if (errorCode != ERROR_SUCCESS) {
         std::cout << "Failed to add filter. Error code: 0x" << std::hex << errorCode << std::endl;
         return errorCode;
@@ -53,14 +53,14 @@ int main()
     Sleep(config_parser.entries[0].value * 1000);
 
     // Remove the filter from the WFP engine
-    errorCode = FwpmFilterDeleteById0(engineHandle, filterId);
+    errorCode = FwpmFilterDeleteById(engineHandle, filterId);
     if (errorCode != ERROR_SUCCESS) {
         std::cout << "Failed to delete filter. Error code: 0x" << std::hex << errorCode << std::endl;
         return errorCode;
     }
 
     // Close the session with the WFP engine
-    FwpmEngineClose0(engineHandle);
+    FwpmEngineClose(engineHandle);
 
     return 0;
 }
