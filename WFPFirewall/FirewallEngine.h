@@ -16,7 +16,7 @@ public:
 private:
 	void closeEngine();
 	HANDLE engineHandle = nullptr;
-	GUID sublayerKey;
+	GUID sublayerKey = { 0 };
 	std::vector<uint64_t> filterIds;
 };
 
