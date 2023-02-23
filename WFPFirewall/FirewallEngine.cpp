@@ -114,19 +114,25 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
     AddrMask.addr = ip;
     AddrMask.mask = mask;
 
-    FWPM_FILTER_CONDITION condition = { 0 };
-    condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-    condition.matchType = FWP_MATCH_EQUAL;
-    condition.conditionValue.type = FWP_V4_ADDR_MASK;
-    condition.conditionValue.v4AddrMask = &AddrMask;
+    FWPM_FILTER_CONDITION condition[2] = {0};
+    // Condition 0: match IP and mask
+    condition[0].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+    condition[0].matchType = FWP_MATCH_EQUAL;
+    condition[0].conditionValue.type = FWP_V4_ADDR_MASK;
+    condition[0].conditionValue.v4AddrMask = &AddrMask;
+    // Condition 1: for time-limit filters: match only TCP  // TODO condition here when we support data limit
+    condition[1].fieldKey = FWPM_CONDITION_IP_PROTOCOL;
+    condition[1].matchType = FWP_MATCH_EQUAL;
+    condition[1].conditionValue.type = FWP_UINT8;
+    condition[1].conditionValue.uint8 = IPPROTO_TCP;
 
     FWPM_FILTER filter = { 0 };
     filter.layerKey = FWPM_LAYER_OUTBOUND_TRANSPORT_V4;
     filter.subLayerKey = sublayerKey;
     filter.action.type = block ? FWP_ACTION_BLOCK : FWP_ACTION_PERMIT;
     filter.weight.type = FWP_EMPTY;
-    filter.numFilterConditions = 1;
-    filter.filterCondition = &condition;
+    filter.numFilterConditions = 2; // TODO 1 here for data limit filters
+    filter.filterCondition = &condition[0];
     filter.displayData.name = const_cast<wchar_t*>(L"TODO set a nice name");
     filter.displayData.description = const_cast<wchar_t*>(L"TODO set a nice description");
 
@@ -152,7 +158,6 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
 
 static void CALLBACK makeFilerBlockingAfterTimeLimitCb(void* args, bool __unused) {
     FilterPrivateData* filterData = static_cast<FilterPrivateData*>(args);
-
     // Add the same filter but blocking and without a timer supervision
     filterData->firewall->addFilter(filterData->ip, filterData->mask, 0, true);
 
