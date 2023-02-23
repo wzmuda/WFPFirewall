@@ -129,10 +129,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ConfigParser.cpp" />
+    <ClCompile Include="FirewallEngine.cpp" />
     <ClCompile Include="WFPFirewall.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConfigParser.h" />
+    <ClInclude Include="FirewallEngine.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="wfpfirewall.cfg">
