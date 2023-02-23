@@ -2,6 +2,7 @@
 #include <iostream>
 #include "ConfigParser.h"
 #include "FirewallEngine.h"
+#include <conio.h>
 
 
 
@@ -32,27 +33,15 @@ int main()
     }
     std::cout << config_file_name << ": found " << config_parser.entries.size() << " rule" <<
         (config_parser.entries.size() > 1 ? "s:" : ":") << std::endl;
+
+    FirewallEngine fw;
     for (auto& e : config_parser.entries) {
         std::cout << "\t allow " << e.host << " for " << e.value <<
             (e.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
+        fw.addFilter(e.ip, e.mask, e.value, false);
     }
 
-
-    FirewallEngine fw;
-
-    uint64_t fid = fw.addFilter(config_parser.entries[0].ip, config_parser.entries[0].mask, false);
-
-    // Wait for the specified duration
-    Sleep(config_parser.entries[0].value * 1000);
-
-    // Remove the filter from the WFP engine
-    fw.deleteFilter(fid);
-
-    std::cout << "BLOCKING!" << std::endl;
-    fid = fw.addFilter(config_parser.entries[0].ip, config_parser.entries[0].mask, true);
-
-
-    Sleep(config_parser.entries[0].value * 1000);
+    _getch();
 
     return 0;
 }

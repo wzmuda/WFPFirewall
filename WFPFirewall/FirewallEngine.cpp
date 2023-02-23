@@ -35,6 +35,13 @@ FirewallEngine::FirewallEngine() {
         closeEngine();
         return;
     }
+
+    timerQueueHandle = CreateTimerQueue();
+    if (timerQueueHandle == nullptr) {
+        std::cerr << "FirewallEngine: Failed to create timer queue." << std::endl;
+        closeEngine();
+        return;
+    }
 }
 
 void FirewallEngine::closeEngine() {
@@ -48,38 +55,61 @@ void FirewallEngine::closeEngine() {
 }
 
 FirewallEngine::~FirewallEngine() {
-    DWORD errorCode = 0;
-    for (auto& id : filterIds) {
-        errorCode = FwpmFilterDeleteById(engineHandle, id);
-        if (errorCode != ERROR_SUCCESS) {
-            std::cout << "Failed to delete filter " << id << ". Error code : 0x" << std::hex << errorCode << std::endl;
-        }
+    for (auto const& filterData : filtersPrivateData) {
+        deleteFilter(filterData.first);
+        // May fail but we're destructing firewall so we're going to lose handles anyway
     }
-    filterIds.clear();
 
-    errorCode = FwpmSubLayerDeleteByKey(engineHandle, &sublayerKey);
+    DWORD errorCode = FwpmSubLayerDeleteByKey(engineHandle, &sublayerKey);
     if (errorCode != ERROR_SUCCESS) {
         std::cerr << "FirewallEngine: Failed to remove sublayer. Error code: " << errorCode << std::endl;
         // Can't do much about it now
     }
     closeEngine();
+
+    if (timerQueueHandle) {
+        if (!DeleteTimerQueueEx(timerQueueHandle, nullptr)) {
+            std::cerr << "FirewallEngine: Failed to delete timer queue." << std::endl;
+        }
+    }
 }
 
-bool FirewallEngine::deleteFilter(uint64_t id) {
-    size_t pos = std::distance(filterIds.begin(), find(filterIds.begin(), filterIds.end(), id));
-    if (pos >= filterIds.size()) {
-        return true; // Nothing to delete
+bool FirewallEngine::deleteFilter(uint64_t filterId) {
+    if (!filtersPrivateData.count(filterId)) {
+        return true;
     }
-    filterIds.erase(filterIds.begin() + pos);
 
-    DWORD errorCode = FwpmFilterDeleteById(engineHandle, id);
+    if (filtersPrivateData[filterId]->timerHandle) {
+        if (!DeleteTimerQueueTimer(timerQueueHandle, filtersPrivateData[filterId]->timerHandle, nullptr)) {
+            if (GetLastError() == ERROR_IO_PENDING) {
+                // This is ok - apparently we're called from the timer.
+                // The timer is well behaved and will not touch this data anymore - it'll end after
+                // we're out of this routine.
+                delete filtersPrivateData[filterId];
+            }
+            else {
+                std::cerr << "FirewallEngine: Failed to delete timer for filter " << filterId <<
+                    ": " << GetLastError() << std::endl;
+            }
+        }
+        else {
+            delete filtersPrivateData[filterId];
+        }
+    }
+
+    DWORD errorCode = FwpmFilterDeleteById(engineHandle, filterId);
     if (errorCode != ERROR_SUCCESS) {
-        std::cout << "Failed to delete filter " << id << ". Error code : 0x" << std::hex << errorCode << std::endl;
+        std::cout << "FirewallEngine: Failed to delete filter " << filterId << ". Error code : 0x" << std::hex << errorCode << std::endl;
+        return false;
     }
+
+    filtersPrivateData.erase(filterId);
+
+    return true;
 }
 
 
-uint64_t FirewallEngine::addFilter(uint32_t ip, uint32_t mask, bool block) {
+bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block) {
     FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
     AddrMask.addr = ip;
     AddrMask.mask = mask;
@@ -104,9 +134,43 @@ uint64_t FirewallEngine::addFilter(uint32_t ip, uint32_t mask, bool block) {
     DWORD errorCode = FwpmFilterAdd(engineHandle, &filter, NULL, &filterId);
     if (errorCode != ERROR_SUCCESS) {
         std::cerr << "Failed to add filter. Error code: 0x" << std::hex << errorCode << std::endl;
-        return filterId;
+        return false;
     }
-    filterIds.push_back(filterId);
 
-    return filterId;
+    filtersPrivateData.insert({ filterId, new FilterPrivateData(this, filterId, ip, mask) });
+    if (time_limit_seconds > 0) {
+        if (!watchFilter(filterId, time_limit_seconds)) {
+            deleteFilter(filterId);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+
+static void CALLBACK makeFilerBlockingAfterTimeLimitCb(void* args, bool __unused) {
+    FilterPrivateData* filterData = static_cast<FilterPrivateData*>(args);
+
+    // Add the same filter but blocking and without a timer supervision
+    filterData->firewall->addFilter(filterData->ip, filterData->mask, 0, true);
+
+    // Delete the old filter
+    if (!filterData->firewall->deleteFilter(filterData->filterId)) {
+        return;
+    }
+}
+
+bool FirewallEngine::watchFilter(uint64_t filterId, uint64_t time_limit_seconds) {
+    if (!CreateTimerQueueTimer(
+        &filtersPrivateData[filterId]->timerHandle, timerQueueHandle,
+        reinterpret_cast<WAITORTIMERCALLBACK>(makeFilerBlockingAfterTimeLimitCb), filtersPrivateData[filterId],
+        time_limit_seconds * 1000, 0, WT_EXECUTEONLYONCE) // TODO periodic if data limit
+    ) {
+        std::cerr << "Failed to create timer to watch filter " << filterId << std::endl;
+        return false;
+    }
+ 
+    return true;
 }
