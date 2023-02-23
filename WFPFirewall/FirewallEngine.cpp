@@ -82,7 +82,7 @@ bool FirewallEngine::deleteFilter(uint64_t id) {
 uint64_t FirewallEngine::addFilter(uint32_t ip, uint32_t mask, bool block) {
     FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
     AddrMask.addr = ip;
-    AddrMask.mask = 0xffffffff;
+    AddrMask.mask = mask;
 
     FWPM_FILTER_CONDITION condition = { 0 };
     condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
