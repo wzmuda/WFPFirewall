@@ -27,18 +27,18 @@ int main()
 
     std::ifstream rules(rules_file_name);
     RuleParser rule_parser(rules);
-    if (rule_parser.rules.size() == 0) {
+    if (rule_parser.size() == 0) {
         std::cerr << rules_file_name << ": found no valid rules." << std::endl;
         return 1;
     }
-    std::cout << rules_file_name << ": found " << rule_parser.rules.size() << " rule" <<
-        (rule_parser.rules.size() > 1 ? "s:" : ":") << std::endl;
+    std::cout << rules_file_name << ": found " << rule_parser.size() << " rule" <<
+        (rule_parser.size() > 1 ? "s:" : ":") << std::endl;
 
     FirewallEngine fw;
-    for (auto& e : rule_parser.rules) {
-        std::cout << "\t allow " << e.host << " for " << e.value <<
-            (e.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
-        fw.addFilter(e.ip, e.mask, e.value, false);
+    for (auto& r : rule_parser) {
+        std::cout << "\t allow " << r.host << " for " << r.value <<
+            (r.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
+        fw.addFilter(r.ip, r.mask, r.value, false);
     }
 
     _getch();

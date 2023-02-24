@@ -33,13 +33,14 @@ namespace WFPFirewallTests
 
 			RuleParser rp(rules_fstream);
 
-			Assert::AreEqual<size_t>(1, rp.rules.size());
+			Assert::AreEqual<size_t>(1, rp.size());
 
-			Assert::AreEqual<uint32_t>(0xc0a80001, rp.rules[0].ip);
-			Assert::AreEqual<uint32_t>(0xffffffff, rp.rules[0].mask);
-			Assert::AreEqual<uint32_t>(htons(2137), rp.rules[0].port);
-			Assert::AreEqual<uint32_t>(666, rp.rules[0].value);
-			Assert::AreEqual<LimitType>(LimitType::Seconds, rp.rules[0].unit);
+			auto r = rp.begin();
+			Assert::AreEqual<uint32_t>(0xc0a80001, r->ip);
+			Assert::AreEqual<uint32_t>(0xffffffff, r->mask);
+			Assert::AreEqual<uint32_t>(htons(2137), r->port);
+			Assert::AreEqual<uint32_t>(666, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Seconds, r->unit);
 		}
 
 		TEST_METHOD(RuleParserTestMultipleValidEntries)
@@ -53,25 +54,28 @@ namespace WFPFirewallTests
 
 			RuleParser rp(rules_fstream);
 
-			Assert::AreEqual<size_t>(3, rp.rules.size());
+			Assert::AreEqual<size_t>(3, rp.size());
 
-			Assert::AreEqual<uint32_t>(0xc0a80001, rp.rules[0].ip);
-			Assert::AreEqual<uint32_t>(0xffffffff, rp.rules[0].mask);
-			Assert::AreEqual<uint32_t>(htons(2137), rp.rules[0].port);
-			Assert::AreEqual<uint32_t>(666, rp.rules[0].value);
-			Assert::AreEqual<LimitType>(LimitType::Seconds, rp.rules[0].unit);
+			auto r = rp.begin();
+			Assert::AreEqual<uint32_t>(0xc0a80001, r->ip);
+			Assert::AreEqual<uint32_t>(0xffffffff, r->mask);
+			Assert::AreEqual<uint32_t>(htons(2137), r->port);
+			Assert::AreEqual<uint32_t>(666, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Seconds, r->unit);
 
-			Assert::AreEqual<uint32_t>(0x01020304, rp.rules[1].ip);
-			Assert::AreEqual<uint32_t>(0xffff0000, rp.rules[1].mask);
-			Assert::AreEqual<uint32_t>(0, rp.rules[1].port);
-			Assert::AreEqual<uint32_t>(10, rp.rules[1].value);
-			Assert::AreEqual<LimitType>(LimitType::Bytes, rp.rules[1].unit);
+			r++;
+			Assert::AreEqual<uint32_t>(0x01020304, r->ip);
+			Assert::AreEqual<uint32_t>(0xffff0000, r->mask);
+			Assert::AreEqual<uint32_t>(0, r->port);
+			Assert::AreEqual<uint32_t>(10, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Bytes, r->unit);
 
-			Assert::AreEqual<uint32_t>(0x04030201, rp.rules[2].ip);
-			Assert::AreEqual<uint32_t>(0xffffff00, rp.rules[2].mask);
-			Assert::AreEqual<uint32_t>(0, rp.rules[2].port);
-			Assert::AreEqual<uint32_t>(3000000000, rp.rules[2].value);
-			Assert::AreEqual<LimitType>(LimitType::Bytes, rp.rules[2].unit);
+			r++;
+			Assert::AreEqual<uint32_t>(0x04030201, r->ip);
+			Assert::AreEqual<uint32_t>(0xffffff00, r->mask);
+			Assert::AreEqual<uint32_t>(0, r->port);
+			Assert::AreEqual<uint32_t>(3000000000, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Bytes, r->unit);
 		}
 
 		TEST_METHOD(RuleParserTestInvalidEntry)
@@ -82,7 +86,7 @@ namespace WFPFirewallTests
 
 			RuleParser rp(rules_fstream);
 
-			Assert::AreEqual<size_t>(0, rp.rules.size());
+			Assert::AreEqual<size_t>(0, rp.size());
 
 		}
 	};

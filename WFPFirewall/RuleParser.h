@@ -17,10 +17,17 @@ struct Rule {
 
 class RuleParser
 {
+	using rules_t = std::vector<Rule>;
 public:
+	using const_iterator = rules_t::const_iterator;
+
 	RuleParser(std::ifstream& rules);
 
-	// TODO this should be private and operator[] should be implemented
-	std::vector<Rule> rules;
+	const_iterator begin() const { return rules.begin(); }
+	const_iterator end() const { return rules.end(); }
+	size_t size() const { return rules.size(); }
+
+private:
+	rules_t rules;
 };
 
