@@ -6,7 +6,7 @@
 
 enum class LimitType { Bytes, Seconds };
 
-struct ConfigEntry {
+struct Rule {
 	uint32_t ip;
 	std::string host;
 	uint32_t mask; // 0xFFFFFFF if not explicitly passed
@@ -15,12 +15,12 @@ struct ConfigEntry {
 	LimitType unit; // unit for the value
 };
 
-class ConfigParser
+class RuleParser
 {
 public:
-	ConfigParser(std::ifstream& config_stream);
+	RuleParser(std::ifstream& rules);
 
 	// TODO this should be private and operator[] should be implemented
-	std::vector<ConfigEntry> entries;
+	std::vector<Rule> rules;
 };
 

@@ -128,12 +128,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ConfigParser.cpp" />
+    <ClCompile Include="RuleParser.cpp" />
     <ClCompile Include="FirewallEngine.cpp" />
     <ClCompile Include="WFPFirewall.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConfigParser.h" />
+    <ClInclude Include="RuleParser.h" />
     <ClInclude Include="FirewallEngine.h" />
   </ItemGroup>
   <ItemGroup>
