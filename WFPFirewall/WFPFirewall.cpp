@@ -38,7 +38,7 @@ int main()
     for (auto& r : rule_parser) {
         std::cout << "\t allow " << r.host << " for " << r.value <<
             (r.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
-        fw.addFilter(r.ip, r.mask, r.value, false);
+        fw.addFilter(r.ip, r.mask, r.value, false, false);
     }
 
     _getch();

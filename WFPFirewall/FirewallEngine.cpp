@@ -1,11 +1,20 @@
 #include "FirewallEngine.h"
 #include <windows.h>
+#include <initguid.h>
 #include <fwpmu.h>
 #include <iostream>
 #include <algorithm>
 
 #pragma comment(lib, "fwpuclnt.lib")
 #pragma comment(lib, "Rpcrt4.lib")
+
+
+#define FIREWALL_ENGINE_SUBLAYER_NAME L"Wojtek's WFPFirewall Sublayer"
+#define FIREWALL_ENGINE_SUBLAYER_DESC L"Container for filters added by Wojtek's WFPFirewall"
+DEFINE_GUID(
+    FIREWALL_ENGINE_SUBLAYER_KEY,
+    0xb1f8e8ce, 0xd562, 0x4a51, 0x88, 0xb8, 0x3e, 0x1c, 0x23, 0xe2, 0xd2, 0xf9
+);
 
 
 FirewallEngine::FirewallEngine() {
@@ -15,22 +24,14 @@ FirewallEngine::FirewallEngine() {
         return;
     }
 
-    errorCode = UuidCreate(&sublayerKey);
-    if (errorCode != ERROR_SUCCESS) {
-        std::cerr << "FirewallEngine: Failed to generate UUID. Error code: " << errorCode << std::endl;
-        closeEngine();
-        return;
-    }
-
     FWPM_SUBLAYER sublayer = { 0 };
     sublayer.displayData.name = const_cast<wchar_t*>(FIREWALL_ENGINE_SUBLAYER_NAME);
     sublayer.displayData.description = const_cast<wchar_t*>(FIREWALL_ENGINE_SUBLAYER_DESC);
-    sublayer.flags = 0;
+    sublayer.flags = FWPM_SUBLAYER_FLAG_PERSISTENT;
     sublayer.weight = 0x100;
-    sublayer.subLayerKey = sublayerKey;
-
+    sublayer.subLayerKey = FIREWALL_ENGINE_SUBLAYER_KEY;
     errorCode = FwpmSubLayerAdd(engineHandle, &sublayer, NULL);
-    if (errorCode != ERROR_SUCCESS) {
+    if (errorCode != ERROR_SUCCESS && errorCode != FWP_E_ALREADY_EXISTS) {
         std::cerr << "FirewallEngine: Failed to add sublayer. Error code: " << errorCode << std::endl;
         closeEngine();
         return;
@@ -55,22 +56,15 @@ void FirewallEngine::closeEngine() {
 }
 
 FirewallEngine::~FirewallEngine() {
-    for (auto const& filterData : filtersPrivateData) {
-        deleteFilter(filterData.first);
-        // May fail but we're destructing firewall so we're going to lose handles anyway
-    }
-
-    DWORD errorCode = FwpmSubLayerDeleteByKey(engineHandle, &sublayerKey);
-    if (errorCode != ERROR_SUCCESS) {
-        std::cerr << "FirewallEngine: Failed to remove sublayer. Error code: " << errorCode << std::endl;
-        // Can't do much about it now
-    }
     closeEngine();
 
     if (timerQueueHandle) {
         if (!DeleteTimerQueueEx(timerQueueHandle, nullptr)) {
             std::cerr << "FirewallEngine: Failed to delete timer queue." << std::endl;
         }
+    }
+    for (auto& e : filtersPrivateData) {
+        delete e.second;
     }
 }
 
@@ -108,8 +102,7 @@ bool FirewallEngine::deleteFilter(uint64_t filterId) {
     return true;
 }
 
-
-bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block) {
+bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent) {
     FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
     AddrMask.addr = ip;
     AddrMask.mask = mask;
@@ -128,13 +121,14 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
 
     FWPM_FILTER filter = { 0 };
     filter.layerKey = FWPM_LAYER_OUTBOUND_TRANSPORT_V4;
-    filter.subLayerKey = sublayerKey;
+    filter.subLayerKey = FIREWALL_ENGINE_SUBLAYER_KEY;
     filter.action.type = block ? FWP_ACTION_BLOCK : FWP_ACTION_PERMIT;
     filter.weight.type = FWP_EMPTY;
     filter.numFilterConditions = 2; // TODO 1 here for data limit filters
     filter.filterCondition = &condition[0];
     filter.displayData.name = const_cast<wchar_t*>(L"TODO set a nice name");
     filter.displayData.description = const_cast<wchar_t*>(L"TODO set a nice description");
+    filter.flags = persistent ? FWPM_FILTER_FLAG_PERSISTENT : 0;
 
     uint64_t filterId = 0;
     DWORD errorCode = FwpmFilterAdd(engineHandle, &filter, NULL, &filterId);
@@ -144,7 +138,7 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
     }
 
     filtersPrivateData.insert({ filterId, new FilterPrivateData(this, filterId, ip, mask) });
-    if (time_limit_seconds > 0) {
+    if (!persistent && time_limit_seconds > 0) {
         if (!watchFilter(filterId, time_limit_seconds)) {
             deleteFilter(filterId);
             return false;
@@ -154,12 +148,10 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
     return true;
 }
 
-
-
 static void CALLBACK makeFilerBlockingAfterTimeLimitCb(void* args, bool __unused) {
     FilterPrivateData* filterData = static_cast<FilterPrivateData*>(args);
     // Add the same filter but blocking and without a timer supervision
-    filterData->firewall->addFilter(filterData->ip, filterData->mask, 0, true);
+    filterData->firewall->addFilter(filterData->ip, filterData->mask, 0, true, true);
 
     // Delete the old filter
     if (!filterData->firewall->deleteFilter(filterData->filterId)) {
