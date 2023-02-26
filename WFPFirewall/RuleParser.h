@@ -6,6 +6,8 @@
 
 enum class LimitType { Bytes, Seconds };
 
+uint32_t cidrToMask(uint32_t cidr);
+
 struct Rule {
 	uint32_t ip;
 	std::string host;
