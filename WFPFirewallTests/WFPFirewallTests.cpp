@@ -48,13 +48,16 @@ namespace WFPFirewallTests
 			std::stringstream rules(
 				"192.168.0.1:2137 666s\n"
 				"1.2.3.4/16 10B\n"
-				"4.3.2.1/24 3GB");
+				"4.3.2.1/24 3GB\n"
+				"8.8.8.8:123 7m\n"
+				"127.0.0.1/13 10h\n"
+			);
 			std::ifstream rules_fstream;
 			rules_fstream.basic_ios<char>::rdbuf(rules.rdbuf());
 
 			RuleParser rp(rules_fstream);
 
-			Assert::AreEqual<size_t>(3, rp.size());
+			Assert::AreEqual<size_t>(5, rp.size());
 
 			auto r = rp.begin();
 			Assert::AreEqual<uint32_t>(0xc0a80001, r->ip);
@@ -76,6 +79,20 @@ namespace WFPFirewallTests
 			Assert::AreEqual<uint32_t>(0, r->port);
 			Assert::AreEqual<uint32_t>(3000000000, r->value);
 			Assert::AreEqual<LimitType>(LimitType::Bytes, r->unit);
+
+			r++;
+			Assert::AreEqual<uint32_t>(0x08080808, r->ip);
+			Assert::AreEqual<uint32_t>(0xffffffff, r->mask);
+			Assert::AreEqual<uint32_t>(htons(123), r->port);
+			Assert::AreEqual<uint32_t>(420, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Seconds, r->unit);
+
+			r++;
+			Assert::AreEqual<uint32_t>(0x7f000001, r->ip);
+			Assert::AreEqual<uint32_t>(0xfff80000, r->mask);
+			Assert::AreEqual<uint32_t>(0, r->port);
+			Assert::AreEqual<uint32_t>(36000, r->value);
+			Assert::AreEqual<LimitType>(LimitType::Seconds, r->unit);
 		}
 
 		TEST_METHOD(RuleParserTestInvalidEntry)
