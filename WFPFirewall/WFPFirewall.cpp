@@ -37,10 +37,20 @@ int main()
     FirewallEngine fw;
     for (auto& r : rule_parser) {
         std::cout << "\t allow " << r.host << " for " << r.value <<
-            (r.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
-        fw.addFilter(r.ip, r.mask, r.value, false, false);
+            (r.unit == LimitType::Bytes ? " bytes" : " seconds") <<
+            (r.unit == LimitType::Bytes ? " (SKIPPED; data limit not supported)" : "") << std::endl;
     }
 
+    for (auto& r : rule_parser) {
+        if (r.unit != LimitType::Bytes) {
+            fw.addFilter(r.ip, r.mask, r.value, false, false);
+        }
+    }
+
+    std::cout << std::endl <<
+        "Rules added. Press any key to terminate the program. " << std::endl <<
+        "Rules that have expired are now persistent and will remain after reboot. " << std::endl <<
+        "Rules that have not expired will be removed automatically on reboot." << std::endl;
     _getch();
 
     return 0;
