@@ -126,8 +126,8 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
     filter.weight.type = FWP_EMPTY;
     filter.numFilterConditions = 2; // TODO 1 here for data limit filters
     filter.filterCondition = &condition[0];
-    filter.displayData.name = const_cast<wchar_t*>(L"TODO set a nice name");
-    filter.displayData.description = const_cast<wchar_t*>(L"TODO set a nice description");
+    filter.displayData.name = const_cast<wchar_t*>(L"Wojtek's WFPFirewall filter");
+    filter.displayData.description = const_cast<wchar_t*>(L"Wojtek's WFPFirewall filter");
     filter.flags = persistent ? FWPM_FILTER_FLAG_PERSISTENT : 0;
 
     uint64_t filterId = 0;
