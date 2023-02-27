@@ -4,6 +4,7 @@
 #include <fwpmu.h>
 #include <iostream>
 #include <algorithm>
+#include <intrin.h>
 
 #pragma comment(lib, "fwpuclnt.lib")
 #pragma comment(lib, "Rpcrt4.lib")
@@ -102,7 +103,7 @@ bool FirewallEngine::deleteFilter(uint64_t filterId) {
     return true;
 }
 
-bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent) {
+bool FirewallEngine::addFilter(std::string host, uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent) {
     FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
     AddrMask.addr = ip;
     AddrMask.mask = mask;
@@ -137,7 +138,7 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
         return false;
     }
 
-    filtersPrivateData.insert({ filterId, new FilterPrivateData(this, filterId, ip, mask) });
+    filtersPrivateData.insert({ filterId, new FilterPrivateData(this, host, filterId, ip, mask) });
     if (!persistent && time_limit_seconds > 0) {
         if (!watchFilter(filterId, time_limit_seconds)) {
             deleteFilter(filterId);
@@ -150,8 +151,10 @@ bool FirewallEngine::addFilter(uint32_t ip, uint32_t mask, uint64_t time_limit_s
 
 static void CALLBACK makeFilerBlockingAfterTimeLimitCb(void* args, bool __unused) {
     FilterPrivateData* filterData = static_cast<FilterPrivateData*>(args);
+    std::cout << "Filter expired: " << filterData->host << "/" << __popcnt(filterData->mask) <<
+        ": turning to persistent block." << std::endl;
     // Add the same filter but blocking and without a timer supervision
-    filterData->firewall->addFilter(filterData->ip, filterData->mask, 0, true, true);
+    filterData->firewall->addFilter(filterData->host, filterData->ip, filterData->mask, 0, true, true);
 
     // Delete the old filter
     if (!filterData->firewall->deleteFilter(filterData->filterId)) {
