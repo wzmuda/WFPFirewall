@@ -16,7 +16,7 @@ void print_banner(void) {
         "========================     WFPFirewall     =================================" << std::endl <<
         "========================                     =================================" << std::endl <<
         "=========    Manage your network in cumbersome and inefficient way!   ========" << std::endl <<
-        "=========            (C) 20203 Wojciech Zmuda                         ========" << std::endl <<
+        "=========            (C) 2023 Wojciech Zmuda                         ========" << std::endl <<
         "==============================================================================" <<
         std::endl << std::endl << std::endl;
 }
