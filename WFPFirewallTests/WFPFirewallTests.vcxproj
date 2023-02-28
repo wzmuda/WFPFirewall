@@ -23,7 +23,7 @@
     <ProjectGuid>{AE3FA5A2-0AA0-45C2-A703-486445E8B22F}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>WFPFirewallTests</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
     <ProjectSubType>NativeUnitTestProject</ProjectSubType>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
