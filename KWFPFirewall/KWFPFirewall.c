@@ -39,6 +39,13 @@ VOID NTAPI DriverExit(_In_ PDRIVER_OBJECT pDriverObject) {
 
 	LOG("Driver EXIT.");
 
+	NTSTATUS status = FwpsCalloutUnregisterById(gCalloutOutboundIdentifier);
+	LOG_STATUS("unregister outbound callout", status);
+	status = FwpmCalloutDeleteByKey(gEngineHandle, &TA_CALLOUT_OUTBOUND_GUID);
+	LOG_STATUS("delete callout", status);
+	status = FwpmEngineClose(gEngineHandle);
+	LOG_STATUS("close engine", status);
+
 	IoDeleteDevice(gDeviceObject);
 
 	LOG("SUCCESS: DriverExit done");
@@ -125,6 +132,12 @@ NTSTATUS NTAPI notifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUI
 	return STATUS_SUCCESS;
 }
 
+VOID NTAPI deleteFn(_In_ UINT16 layerId, _In_ UINT32 calloutId, _In_ UINT64 flowContext) {
+	UNREFERENCED_PARAMETER(layerId);
+	UNREFERENCED_PARAMETER(calloutId);
+	UNREFERENCED_PARAMETER(flowContext);
+}
+
 NTSTATUS NTAPI DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRegistryPath) {
 	UNREFERENCED_PARAMETER(pRegistryPath);
 
@@ -134,15 +147,15 @@ NTSTATUS NTAPI DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRI
 	pDriverObject->DriverUnload = DriverExit;
 
 	status = IoCreateDevice(pDriverObject, 0, NULL, FILE_DEVICE_NETWORK, FILE_DEVICE_SECURE_OPEN, FALSE, &gDeviceObject);
-	LOG_STATUS("failed to create device", status);
+	LOG_STATUS("create device", status);
 	if (!NT_SUCCESS(status)) {
-		goto finalize;
+		return status;
 	}
 
 	status = FwpmEngineOpen(NULL, RPC_C_AUTHN_WINNT, NULL, NULL, &gEngineHandle);
-	LOG_STATUS("failed to open filter engine", status);
+	LOG_STATUS("open filter engine", status);
 	if (!NT_SUCCESS(status)) {
-		goto finalize;
+		return status;
 	}
 
 	FWPS_CALLOUT calloutRegister = {
@@ -150,12 +163,13 @@ NTSTATUS NTAPI DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRI
 		.flags = 0,
 		.classifyFn = classifyFn,
 		.notifyFn = notifyFn,
-		.flowDeleteFn = NULL,
+		.flowDeleteFn = deleteFn,
 	};
 
-	status = FwpsCalloutRegister(&gDeviceObject, &calloutRegister, &gCalloutOutboundIdentifier);
-	LOG_STATUS("failed to register outbound callout", status);
+	status = FwpsCalloutRegister(gDeviceObject, &calloutRegister, &gCalloutOutboundIdentifier);
+	LOG_STATUS("register outbound callout", status);
 	if (!NT_SUCCESS(status)) {
+		FwpmEngineClose(gEngineHandle);
 		return status;
 	}
 
@@ -170,10 +184,9 @@ NTSTATUS NTAPI DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRI
 		.calloutId = gCalloutOutboundIdentifier,
 	};
 
-	status = FwpmCalloutAdd(&gEngineHandle, &calloutAdd, NULL, NULL);
-	LOG_STATUS("failed to add outbound callout to filter engine", status)
+	status = FwpmCalloutAdd(gEngineHandle, &calloutAdd, NULL, NULL);
+	LOG_STATUS("add outbound callout to filter engine", status)
 
-finalize:
 	LOG("SUCCESS: DriverEntry done");
 	return status;
 }
