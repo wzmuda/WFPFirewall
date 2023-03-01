@@ -37,13 +37,17 @@ int main()
     FirewallEngine fw;
     for (auto& r : rule_parser) {
         std::cout << "\t allow " << r.host << " for " << r.value <<
-            (r.unit == LimitType::Bytes ? " bytes" : " seconds") <<
-            (r.unit == LimitType::Bytes ? " (SKIPPED; data limit not supported)" : "") << std::endl;
+            (r.unit == LimitType::Bytes ? " bytes" : " seconds") << std::endl;
     }
 
     for (auto& r : rule_parser) {
-        if (r.unit != LimitType::Bytes) {
-            fw.addFilter(r.host, r.ip, r.mask, r.value, false, false);
+        switch(r.unit) {
+            case LimitType::Bytes:
+                fw.addFilterDataLimit(r.host, r.ip, r.mask, r.value);
+                break;
+            case LimitType::Seconds:
+                fw.addFilterTimeLimit(r.host, r.ip, r.mask, r.value, false, false);
+                break;
         }
     }
 
