@@ -24,7 +24,8 @@ class FirewallEngine
 public:
 	FirewallEngine();
 	~FirewallEngine();
-	bool addFilter(std::string host, uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent);
+	bool addFilterTimeLimit(std::string host, uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent);
+	bool addFilterDataLimit(std::string host, uint32_t ip, uint32_t mask, uint64_t data_limit_bytes);
 	bool deleteFilter(uint64_t filterId);
 private:
 	void closeEngine();

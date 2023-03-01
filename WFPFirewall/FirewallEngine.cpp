@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <intrin.h>
 
+#include "../KWFPFirewall/KWFPFirewall.h"
+
 #pragma comment(lib, "fwpuclnt.lib")
 #pragma comment(lib, "Rpcrt4.lib")
 
@@ -16,7 +18,6 @@ DEFINE_GUID(
     FIREWALL_ENGINE_SUBLAYER_KEY,
     0xb1f8e8ce, 0xd562, 0x4a51, 0x88, 0xb8, 0x3e, 0x1c, 0x23, 0xe2, 0xd2, 0xf9
 );
-
 
 FirewallEngine::FirewallEngine() {
     DWORD errorCode = FwpmEngineOpen(NULL, RPC_C_AUTHN_WINNT, NULL, NULL, &engineHandle);
@@ -103,7 +104,46 @@ bool FirewallEngine::deleteFilter(uint64_t filterId) {
     return true;
 }
 
-bool FirewallEngine::addFilter(std::string host, uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent) {
+bool FirewallEngine::addFilterDataLimit(std::string host, uint32_t ip, uint32_t mask, uint64_t data_limit_bytes) {
+    FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
+    AddrMask.addr = ip;
+    AddrMask.mask = mask;
+
+    FWPM_FILTER_CONDITION condition = { 0 };
+    // Condition 0: match IP and mask
+    condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+    condition.matchType = FWP_MATCH_EQUAL;
+    condition.conditionValue.type = FWP_V4_ADDR_MASK;
+    condition.conditionValue.v4AddrMask = &AddrMask;
+
+    FWPM_FILTER filter = { 0 };
+    filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
+    filter.subLayerKey = FIREWALL_ENGINE_SUBLAYER_KEY;
+    filter.weight.type = FWP_EMPTY;
+    filter.numFilterConditions = 1;
+    filter.filterCondition = &condition;
+    filter.displayData.name = const_cast<wchar_t*>(L"Wojtek's WFPFirewall inbound data limit filter");
+    filter.displayData.description = const_cast<wchar_t*>(L"Limit data you can download");
+    filter.flags = FWPM_FILTER_FLAG_PERMIT_IF_CALLOUT_UNREGISTERED;
+    std::cout << "FirewallEngine: setting up a data limit filter! TODO remove this line pls" << std::endl;
+    filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filter.action.calloutKey = FIREWALL_ENGINE_CALLOUT_DATA_LIMIT_KEY;
+    filter.rawContext = data_limit_bytes;
+
+    uint64_t filterId = 0;
+    DWORD errorCode = FwpmFilterAdd(engineHandle, &filter, NULL, &filterId);
+    if (errorCode != ERROR_SUCCESS) {
+        std::cerr << "Failed to add filter. Error code: 0x" << std::hex << errorCode << std::endl;
+        return false;
+    }
+
+    // TODO this is probably not needed but class destructor would have to follow if I removed this here
+    filtersPrivateData.insert({ filterId, new FilterPrivateData(this, host, filterId, ip, mask) });
+
+    return true;
+}
+
+bool FirewallEngine::addFilterTimeLimit(std::string host, uint32_t ip, uint32_t mask, uint64_t time_limit_seconds, bool block, bool persistent) {
     FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
     AddrMask.addr = ip;
     AddrMask.mask = mask;
@@ -114,7 +154,7 @@ bool FirewallEngine::addFilter(std::string host, uint32_t ip, uint32_t mask, uin
     condition[0].matchType = FWP_MATCH_EQUAL;
     condition[0].conditionValue.type = FWP_V4_ADDR_MASK;
     condition[0].conditionValue.v4AddrMask = &AddrMask;
-    // Condition 1: for time-limit filters: match only TCP  // TODO condition here when we support data limit
+    // Condition 1: match only TCP
     condition[1].fieldKey = FWPM_CONDITION_IP_PROTOCOL;
     condition[1].matchType = FWP_MATCH_EQUAL;
     condition[1].conditionValue.type = FWP_UINT8;
@@ -125,10 +165,10 @@ bool FirewallEngine::addFilter(std::string host, uint32_t ip, uint32_t mask, uin
     filter.subLayerKey = FIREWALL_ENGINE_SUBLAYER_KEY;
     filter.action.type = block ? FWP_ACTION_BLOCK : FWP_ACTION_PERMIT;
     filter.weight.type = FWP_EMPTY;
-    filter.numFilterConditions = 2; // TODO 1 here for data limit filters
+    filter.numFilterConditions = 2;
     filter.filterCondition = &condition[0];
-    filter.displayData.name = const_cast<wchar_t*>(L"Wojtek's WFPFirewall filter");
-    filter.displayData.description = const_cast<wchar_t*>(L"Wojtek's WFPFirewall filter");
+    filter.displayData.name = const_cast<wchar_t*>(L"Wojtek's WFPFirewall time limit filter");
+    filter.displayData.description = const_cast<wchar_t*>(L"Wojtek's WFPFirewall time limit filter");
     filter.flags = persistent ? FWPM_FILTER_FLAG_PERSISTENT : 0;
 
     uint64_t filterId = 0;
@@ -154,7 +194,7 @@ static void CALLBACK makeFilerBlockingAfterTimeLimitCb(void* args, bool __unused
     std::cout << "Filter expired: " << filterData->host << "/" << __popcnt(filterData->mask) <<
         ": turning to persistent block." << std::endl;
     // Add the same filter but blocking and without a timer supervision
-    filterData->firewall->addFilter(filterData->host, filterData->ip, filterData->mask, 0, true, true);
+    filterData->firewall->addFilterTimeLimit(filterData->host, filterData->ip, filterData->mask, 0, true, true);
 
     // Delete the old filter
     if (!filterData->firewall->deleteFilter(filterData->filterId)) {
