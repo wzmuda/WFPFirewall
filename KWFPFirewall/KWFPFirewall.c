@@ -30,8 +30,8 @@ HANDLE gEngineHandle;
 UINT32 gCalloutOutboundIdentifier;
 
 DEFINE_GUID(TA_CALLOUT_OUTBOUND_GUID, 0xee94ec3dL, 0x04d7, 0x44d0, 0xb7, 0x65, 0x38, 0x41, 0xad, 0xfa, 0x2f, 0x38);
-#define TA_CALLOUT_OUTBOUND_NAME L"callout_outbound"
-#define TA_CALLOUT_OUTBOUND_DESCRIPTION L"Callout used for inspecting outbound TCP packets"
+#define TA_CALLOUT_OUTBOUND_NAME L"Wojtek's WFPFirewall Data Limit Callout"
+#define TA_CALLOUT_OUTBOUND_DESCRIPTION L"Callout used for limiting data transfered to certain hosts:ports"
 #define TA_CALLOUT_OUTBOUND_POOL_TAG (UINT32) 'OAT'
 
 VOID NTAPI DriverExit(_In_ PDRIVER_OBJECT pDriverObject) {
@@ -58,25 +58,27 @@ VOID NTAPI classifyFn(
 	_In_opt_ const void* pClassifyContext,
 	_In_ const FWPS_FILTER* pFilter, _In_ UINT64 flowContext, _Inout_ FWPS_CLASSIFY_OUT* pClassifyOut
 ) {
+	LOG("CLASSIFY: henlo");
+
 	// Unreferenced parameters
 	UNREFERENCED_PARAMETER(pClassifyContext);
 	UNREFERENCED_PARAMETER(pFilter);
 	UNREFERENCED_PARAMETER(flowContext);
 
 	// Track progression of callout processing
-	BOOL bufferAllocated = FALSE;
 	ULONG transportHeaderSize = 0;
 	PNET_BUFFER_LIST pNetBufferList = NULL;
 	PNET_BUFFER pNetBuffer = NULL;
-	PBYTE pAllocatedBuffer = NULL;
 
 	// Ensure that the transport header size is specified within the meta values
 	if (!FWPS_IS_METADATA_FIELD_PRESENT(pInMetaValues, FWPS_METADATA_FIELD_TRANSPORT_HEADER_SIZE)) {
+		LOG("CLASSIFY: transport header size not specified");
 		goto finalize;
 	}
 
 	// Ensure that there is layer data
 	if (!pLayerData) {
+		LOG("CLASSIFY: layer data is not there?");
 		goto finalize;
 	}
 
@@ -115,11 +117,7 @@ VOID NTAPI classifyFn(
 
 
 finalize:
-	// Ensure that the buffer is freed
-	if (bufferAllocated) {
-		ExFreePoolWithTag((PVOID)pAllocatedBuffer, TA_CALLOUT_OUTBOUND_POOL_TAG);
-		pAllocatedBuffer = 0;
-	}
+	LOG("CLASSIFY: bye");
 
 	// Default action is to permit
 	pClassifyOut->actionType = FWP_ACTION_PERMIT;
@@ -129,6 +127,8 @@ NTSTATUS NTAPI notifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUI
 	UNREFERENCED_PARAMETER(notifyType);
 	UNREFERENCED_PARAMETER(pFilterKey);
 	UNREFERENCED_PARAMETER(pFilter);
+	LOG("NOTIFY: hi bye");
+
 	return STATUS_SUCCESS;
 }
 
@@ -136,6 +136,8 @@ VOID NTAPI deleteFn(_In_ UINT16 layerId, _In_ UINT32 calloutId, _In_ UINT64 flow
 	UNREFERENCED_PARAMETER(layerId);
 	UNREFERENCED_PARAMETER(calloutId);
 	UNREFERENCED_PARAMETER(flowContext);
+	LOG("DELETE: hi bye");
+
 }
 
 NTSTATUS NTAPI DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRegistryPath) {
